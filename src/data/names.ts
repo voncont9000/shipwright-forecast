@@ -6,11 +6,14 @@ export const COMPANY_PREFIX = [
   'Harbor', 'Indigo', 'Keystone', 'Lantern', 'Monarch', 'Nimbus', 'Onyx', 'Paragon', 'Redwood', 'Summit',
   'Trellis', 'Umber', 'Verity', 'Willow', 'Zephyr', 'Atlas', 'Bramble', 'Copperfield', 'Dovetail', 'Evergreen',
   'Foxglove', 'Goldcrest', 'Hazel', 'Ironbridge', 'Jasper', 'Kingfisher', 'Larkspur', 'Mosaic', 'Nova', 'Oakridge',
+  'Pinecrest', 'Quill', 'Ridgeway', 'Sable', 'Thistle', 'Upland', 'Vesper', 'Wren', 'Yarrow', 'Ashby',
+  'Birchwood', 'Calloway', 'Dunmore', 'Elmhurst', 'Fairlight', 'Glenmoor', 'Hollis', 'Islay', 'Kensington', 'Linden',
 ]
 
 export const COMPANY_SUFFIX = [
   'Logistics', 'Media', 'Health', 'Labs', 'Systems', 'Analytics', 'Robotics', 'Finance', 'Retail', 'Energy',
   'Studios', 'Cloud', 'Foods', 'Mobility', 'Learning', 'Security', 'Bio', 'Travel', 'Capital', 'Works',
+  'Group', 'Partners', 'Software', 'Networks', 'Devices', 'Games', 'Insurance', 'Education', 'Ventures', 'Dynamics', 'Interactive', 'Collective', 'Industries', 'Technologies', 'Solutions', 'Holdings',
 ]
 
 export const SMB_REP_NAMES = [

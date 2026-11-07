@@ -5,6 +5,9 @@ import {
 } from './names'
 import { addDays } from '../domain/dates'
 import { checkEligibility } from '../domain/eligibility'
+import { buildDealComponent, dealWinProbability, learnRates } from '../domain/dealModel'
+import { buildSelfServe, candidateTilt } from '../domain/smbModel'
+import { closedNetForReps, repPrefill } from '../domain/prefill'
 import { seedCalls } from './callSeeder'
 import type {
   Account, ChurnItem, Dataset, Deal, DealType, ForecastCategory, Org, Person, Quarter,
@@ -146,7 +149,7 @@ function buildOrg(rng: Rng): { org: Org; profiles: Map<string, RepProfile> } {
       for (const r of m.reps) {
         const rep: Person = {
           id: slug(r.name), name: r.name, role: 'rep', segment: d.segment, managerId: mgr.id, quota: r.quota,
-          title: `Account Executive, ${d.segment === 'MM' ? 'Mid-Market' : d.segment === 'ENT' ? 'Enterprise' : 'SMB'}`,
+          title: 'Account Executive',
         }
         people.push(rep)
         const rr = rng.fork(rep.id)
@@ -174,18 +177,17 @@ function buildOrg(rng: Rng): { org: Org; profiles: Map<string, RepProfile> } {
 type Cluster = 'high' | 'falling' | 'steady'
 
 function makeCompanyNamer(rng: Rng) {
-  const used = new Set<string>()
+  const all: string[] = []
+  for (const a of COMPANY_PREFIX) for (const b of COMPANY_SUFFIX) all.push(`${a} ${b}`)
+  let pool = rng.shuffle(all)
+  let idx = 0
   return () => {
-    for (let i = 0; i < 200; i++) {
-      const n = `${rng.pick(COMPANY_PREFIX)} ${rng.pick(COMPANY_SUFFIX)}`
-      if (!used.has(n)) {
-        used.add(n)
-        return n
-      }
+    // Unique until the pool runs out (about 2,000 names), then the pool is reshuffled and reused.
+    if (idx >= pool.length) {
+      pool = rng.shuffle(all)
+      idx = 0
     }
-    const n = `${rng.pick(COMPANY_PREFIX)} ${rng.pick(COMPANY_SUFFIX)} ${used.size}`
-    used.add(n)
-    return n
+    return pool[idx++]
   }
 }
 
@@ -194,7 +196,7 @@ const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x
 function buildAccounts(rng: Rng, org: Org, nextName: () => string): { accounts: Account[]; clusters: Map<string, Cluster> } {
   const accounts: Account[] = []
   const clusters = new Map<string, Cluster>()
-  const counts: Record<Segment, number> = { SMB: 300, MM: 150, ENT: 70 }
+  const counts: Record<Segment, number> = { SMB: 1000, MM: 300, ENT: 250 }
   for (const seg of ['SMB', 'MM', 'ENT'] as Segment[]) {
     const reps = org.people.filter((p) => p.role === 'rep' && p.segment === seg)
     for (let i = 0; i < counts[seg]; i++) {
@@ -289,6 +291,8 @@ interface Script {
 }
 
 interface QuarterCtx {
+  /** Scripts generated so far per rep + account (keeps any one account from piling up deals). */
+  acctUse: Map<string, number>
   def: QuarterDef
   qEndDay: number
   weeks: number
@@ -300,10 +304,12 @@ function dayOfWeekEnd(week: number, qEndDay: number): number {
   return week >= 13 ? qEndDay : 7 * week - 1
 }
 
-function pickAccount(rng: Rng, accounts: Account[], clusters: Map<string, Cluster>, ownerId: string): Account {
+function pickAccount(rng: Rng, accounts: Account[], clusters: Map<string, Cluster>, ownerId: string, use: Map<string, number>): Account {
   const mine = accounts.filter((a) => a.ownerId === ownerId)
-  const w = mine.map((a) => (clusters.get(a.id) === 'high' ? 3 : clusters.get(a.id) === 'falling' ? 0.4 : 1))
-  return rng.weighted(mine, w)
+  const free = mine.filter((a) => (use.get(`${ownerId}|${a.id}`) ?? 0) < 2)
+  const pool = free.length > 0 ? free : mine
+  const w = pool.map((a) => (clusters.get(a.id) === 'high' ? 3 : clusters.get(a.id) === 'falling' ? 0.4 : 1))
+  return rng.weighted(pool, w)
 }
 
 function makeScript(
@@ -337,7 +343,7 @@ function makeScript(
     let accountName: string
     let amount: number
     if (type === 'Expansion') {
-      account = pickAccount(rng, accounts, clusters, rep.id)
+      account = pickAccount(rng, accounts, clusters, rep.id, ctx.acctUse)
       accountId = account.id
       accountName = account.name
       amount = account.arr * P.expShare * rng.logNormal(-0.08, 0.4)
@@ -402,10 +408,11 @@ function makeScript(
       quiet.push({ from, to: from + rng.int(fate === 'won' ? 10 : 14, 40) })
     }
 
+    ctx.acctUse.set(`${rep.id}|${accountId}`, (ctx.acctUse.get(`${rep.id}|${accountId}`) ?? 0) + 1)
     return {
       id: `${ctx.def.id}-${rep.id}-${type === 'New' ? 'n' : 'x'}${seq}`,
       ownerId: rep.id, segment: seg, type, accountId, accountName,
-      name: dealName(rng, seg, type),
+      name: `${accountName} — ${dealName(rng, seg, type)}`,
       createdDay, entry, fate, endDay, amount0: amount, amountEvents, q0,
       drift: fate === 'won' ? 0.12 : fate === 'lost' ? -0.1 : -0.03,
       ebDay, planDay, quiet, closeDay0, closeEvents,
@@ -420,8 +427,8 @@ function isOpen(d: Deal): boolean {
 }
 
 function dealName(rng: Rng, seg: Segment, type: DealType): string {
-  if (type === 'Expansion') return rng.pick(seg === 'SMB' ? ['Seat expansion', 'Annual upgrade', 'Credit top-up pack'] : ['Seat expansion', 'Credit pool upsize', 'Add-on workspace'])
-  return rng.pick(seg === 'SMB' ? ['Teams plan', 'Teams, annual'] : seg === 'MM' ? ['Teams rollout', 'Department rollout'] : ['Enterprise platform', 'Enterprise, pooled credits'])
+  if (type === 'Expansion') return rng.pick(seg === 'SMB' ? ['seat expansion', 'annual upgrade', 'credit top-up pack'] : ['seat expansion', 'credit pool upsize', 'add-on workspace'])
+  return rng.pick(seg === 'SMB' ? ['new logo', 'Teams plan'] : seg === 'MM' ? ['new logo', 'department rollout'] : ['new logo', 'Enterprise platform'])
 }
 
 // ───────────────────────── Snapshotting a script ─────────────────────────
@@ -556,9 +563,40 @@ function makeChurn(rng: Rng, ctx: QuarterCtx, accounts: Account[], clusters: Map
   return out
 }
 
+/**
+ * Keeps every rep's realised churn below 40% of what they win (plus their self-serve share), so no rep
+ * ends a quarter with a negative net. Over-sized items move to a rep with room, or shrink to fit (a downgrade).
+ */
+function rebalanceChurn(rng: Rng, ctx: QuarterCtx, scripts: Script[], churn: ChurnScript[], reps: Person[], accounts: Account[]): void {
+  const smbCount = reps.filter((r) => r.segment === 'SMB').length || 1
+  const capacity = new Map<string, number>()
+  for (const r of reps) capacity.set(r.id, r.segment === 'SMB' ? (SELF_SERVE_TARGET * ctx.def.scale * 0.9) / smbCount * 0.4 : 0)
+  for (const sc of scripts) {
+    if (sc.fate === 'won' && sc.endDay >= 0 && sc.endDay <= ctx.qEndDay) capacity.set(sc.ownerId, (capacity.get(sc.ownerId) ?? 0) + 0.4 * sc.amount0)
+  }
+  const used = new Map<string, number>()
+  const room = (id: string) => (capacity.get(id) ?? 0) - (used.get(id) ?? 0)
+  for (const c of churn) {
+    if (!(c.eventDay <= ctx.qEndDay)) continue
+    if (room(c.ownerId) >= c.arr) {
+      used.set(c.ownerId, (used.get(c.ownerId) ?? 0) + c.arr)
+      continue
+    }
+    const peers = reps.filter((r) => r.segment === c.segment)
+    let best = peers[0]
+    for (const r of peers) if (room(r.id) > room(best.id)) best = r
+    c.arr = Math.max(0, Math.min(c.arr, Math.floor(room(best.id) / 100) * 100))
+    c.ownerId = best.id
+    const owned = accounts.filter((a) => a.ownerId === best.id)
+    if (owned.length) c.accountId = rng.pick(owned).id
+    used.set(best.id, (used.get(best.id) ?? 0) + c.arr)
+  }
+}
+
 function churnAt(scripts: ChurnScript[], D: number): ChurnItem[] {
   const out: ChurnItem[] = []
   for (const c of scripts) {
+    if (c.arr <= 0) continue
     const base = { accountId: c.accountId, segment: c.segment, ownerId: c.ownerId, arrAtRisk: c.arr, kind: c.kind, reason: c.reason }
     if (c.eventDay <= D) out.push({ ...base, probability: 1, realised: true })
     else if (c.flagDay <= D) out.push({ ...base, probability: c.p, realised: false })
@@ -636,7 +674,7 @@ function forcedScript(ctx: QuarterCtx, f: ForcedSpec): Script {
   for (let k = 0; k < f.pushes; k++) closeEvents.push({ day: 8 + k * 14, closeDay: closeDay0 + 14 * (k + 1), kind: 'push' })
   return {
     id: `${ctx.def.id}-${f.ownerId}-forced-${f.key}`, ownerId: f.ownerId, segment: 'MM', type: 'New',
-    accountId: `prospect-${f.key}`, accountName: f.account, name: 'Teams rollout',
+    accountId: `prospect-${f.key}`, accountName: f.account, name: `${f.account} — department rollout`,
     createdDay: entry[0], entry, fate: 'stall', endDay: Infinity, amount0: f.amount, amountEvents: [],
     q0: 62, drift: -0.02, ebDay: f.noEB ? Infinity : entry[2], planDay: f.noPlan ? Infinity : entry[3],
     quiet: f.quietFrom ? [{ from: f.quietFrom, to: 90 }] : [], closeDay0, closeEvents,
@@ -722,8 +760,9 @@ function alignPriyaTeam(
     }
     // Early-stage pipeline that will not close this quarter, so coverage stays near 3x despite the thin commit book.
     let padded = 0
+    let padSeq = 5000
     for (let tries = 0; tries < 400 && padded < PRIYA_PIPELINE_PAD; tries++) {
-      const s = makeScript(rng, ctx, rep, profile, rng.chance(0.6) ? 'New' : 'Expansion', seq++, accounts, clusters, true)
+      const s = makeScript(rng, ctx, rep, profile, rng.chance(0.6) ? 'New' : 'Expansion', padSeq++, accounts, clusters, true)
       const d = s && view(s)
       if (s && d && d.category === 'Pipeline' && isOpen(d) && d.closeDate <= ctx.def.end) {
         scripts.push(s)
@@ -746,7 +785,7 @@ function buildQuarter(
 ): Quarter {
   const weeks = isCurrent ? CURRENT_WEEK : 13
   const qEndDay = Math.round((Date.UTC(+def.end.slice(0, 4), +def.end.slice(5, 7) - 1, +def.end.slice(8)) - Date.UTC(+def.start.slice(0, 4), +def.start.slice(5, 7) - 1, +def.start.slice(8))) / 86400000)
-  const ctx: QuarterCtx = { def, qEndDay, weeks, rng, nextName }
+  const ctx: QuarterCtx = { def, qEndDay, weeks, rng, nextName, acctUse: new Map() }
   const plan = {} as Record<Segment, number>
   for (const s of ['SMB', 'MM', 'ENT'] as Segment[]) plan[s] = Math.round((SEGMENT_PLAN[s] * def.scale) / 1000) * 1000
 
@@ -791,6 +830,7 @@ function buildQuarter(
     }
   }
   const churnScripts = makeChurn(rng.fork('churn'), ctx, accounts, clusters, def.scale * (def.churn ?? 1))
+  rebalanceChurn(rng.fork('rebalance'), ctx, scripts, churnScripts, reps, accounts)
   if (isCurrent) alignPriyaTeam(rng.fork('priya-align'), ctx, scripts, churnScripts, profiles, reps, accounts, clusters)
 
   const snapshots: WeekSnapshot[] = []
@@ -846,6 +886,74 @@ export function computeActuals(org: Org, q: Quarter): QuarterActuals {
   return { newArr, expansionArr, churnArr, netNewArr: newArr + expansionArr - churnArr, bySegment, byPerson }
 }
 
+// ───────────────────────── Aligning the model with the story ─────────────────────────
+
+/** Where the model's expected week-6 net ARR sits for Priya's reps (Ana is the deliberate over-caller: commit $205k). */
+const PRIYA_MODEL_TARGETS: Record<string, number> = {
+  'marcus-lee': 208_000, 'ana-souza': 172_000, 'tom-becker': 150_000, 'grace-kim': 192_000, 'diego-ruiz': 88_000,
+}
+/** Model expectation relative to a rep's commit, by segment (commit is the conservative number). */
+const MODEL_OVER_COMMIT: Record<Segment, number> = { SMB: 1.04, MM: 1.1, ENT: 1.08 }
+
+/**
+ * The current quarter's non-commit open deals are sized so the model's expectation per rep sits close to the
+ * rep's commit (a few percent above, as a conservative commit should), except for Priya's team, which follows
+ * the approved prototype: Ana, the deliberate over-caller, has a commit well above her model.
+ */
+function alignModel(ds: Dataset, rng: Rng): void {
+  const qi = ds.quarters.length - 1
+  const q = ds.quarters[qi]
+  const week = CURRENT_WEEK
+  const rates = learnRates(ds, week, null)
+  const reps = ds.org.people.filter((p) => p.role === 'rep')
+  const smbCount = reps.filter((r) => r.segment === 'SMB').length
+
+  const targets = new Map<string, number>()
+  for (const r of reps) {
+    if (PRIYA_MODEL_TARGETS[r.id] !== undefined) {
+      targets.set(r.id, PRIYA_MODEL_TARGETS[r.id])
+      continue
+    }
+    const closed = closedNetForReps(ds, qi, week, [r.id])
+    const commit = repPrefill(ds, qi, week, r.id).commit
+    targets.set(r.id, Math.max(commit, closed + 10_000) * MODEL_OVER_COMMIT[r.segment as Segment] * (1 + rng.normal(0, 0.05)))
+  }
+
+  const snap = q.snapshots[week - 1]
+  const scalable = new Map<string, Set<string>>()
+  for (const r of reps) {
+    const priya = PRIYA_MODEL_TARGETS[r.id] !== undefined
+    const ids = new Set<string>()
+    for (const d of snap.deals) {
+      if (d.ownerId !== r.id || d.stage === 'Closed Won' || d.stage === 'Closed Lost') continue
+      if (d.category === 'Commit' || (priya && (d.id.includes('-forced-') || /-[nx]5\d{3}$/.test(d.id)))) continue
+      ids.add(d.id)
+    }
+    scalable.set(r.id, ids)
+  }
+
+  for (let pass = 0; pass < 3; pass++) {
+    for (const r of reps) {
+      const ids = scalable.get(r.id)!
+      const closed = closedNetForReps(ds, qi, week, [r.id])
+      const comp = buildDealComponent(ds, qi, week, [r.id], rates, closed, candidateTilt(ds, qi, [r.id]))
+      let mean = comp.mean
+      if (r.segment === 'SMB') {
+        const ss = buildSelfServe(ds, qi, week)
+        mean += (ss.mean - ss.closed) / smbCount
+      }
+      let weighted = 0
+      for (const d of snap.deals) if (ids.has(d.id)) weighted += dealWinProbability(d, q.start, q.end, snap.asOf, rates) * d.amount
+      if (weighted <= 0) continue
+      const g = Math.min(3, Math.max(0.15, 1 + (targets.get(r.id)! - mean) / weighted))
+      const unit = SEG[r.segment as Segment].round
+      for (const s of q.snapshots) {
+        for (const d of s.deals) if (ids.has(d.id)) d.amount = Math.max(unit, Math.round((d.amount * g) / unit) * unit)
+      }
+    }
+  }
+}
+
 // ───────────────────────── Entry point ─────────────────────────
 
 export function generateDataset(seed = 42): Dataset {
@@ -868,6 +976,7 @@ export function generateDataset(seed = 42): Dataset {
   }
 
   const ds: Dataset = { seed, company: 'Shipwright', org, accounts, quarters, currentWeek: CURRENT_WEEK }
+  alignModel(ds, rng.fork('align'))
   seedCalls(ds, rng.fork('calls'), profiles)
   return ds
 }

@@ -3,6 +3,7 @@ import type { Call, CallTriple, Dataset, Person, Quarter } from '../domain/types
 import { allReps, childrenOf, repIdsUnder } from '../domain/org'
 import { indexDealsByOwner, repBook, composeFromBook, toTriple } from '../domain/prefill'
 import { snapshotAt } from '../domain/org'
+import { modelForReps } from '../domain/model'
 
 /** Subset of RepProfile the seeder needs (avoids a circular import with generator.ts). */
 interface Profile { landing: number; firstQuarter: number }
@@ -15,8 +16,8 @@ const LEVEL: Record<'manager' | 'director' | 'cro', { phi: number; p: number }> 
 }
 /** Honest view of the open part of the quarter: commit / most likely / best case as a share of what will close. */
 const HONEST = { commit: 0.83, mostLikely: 1, bestCase: 1.17 }
-/** Current quarter has no actuals: a level's view of its reports' open ARR (reps over-call by ~15% on most-likely). */
-export const CURRENT_KAPPA = { commit: 1.0, mostLikely: 0.95, bestCase: 0.8 }
+/** In the current quarter (no actuals yet) managers, directors and the CRO call about at the model's expectation. */
+const MODEL_LEAN = 1.0
 
 const DOWN = [
   'Haircut for slip risk on late-stage deals',
@@ -99,15 +100,13 @@ function seedQuarter(ds: Dataset, q: Quarter, qi: number, rng: Rng, profiles: Ma
         const snap = snapshotAt(q, w)
         let t = toTriple(composeFromBook(repBook(ds, q, snap, r.id)))
         if (w < q.weeksElapsed) {
-          // Early in the quarter reps lean on experience, not just on how deals are categorised that week:
-          // blend toward the open ARR they end up calling at the latest week.
+          // Earlier weeks: the call drifts gently toward this week's number (about 1.5% a week),
+          // rather than jumping each time deals change category.
           const latest = toTriple(composeFromBook(repBook(ds, q, snapshotAt(q, q.weeksElapsed), r.id)))
           const c = closedFor(w, [r.id])
-          const a = (0.75 * (q.weeksElapsed - w)) / (q.weeksElapsed - 1)
-          const n = 1 + rng.normal(0, 0.03)
-          const blend = (own: number, latestV: number) => Math.round(c + (own - c) * (1 - a) + Math.max(0, latestV - c) * n * a)
-          t = { commit: blend(t.commit, latest.commit), mostLikely: blend(t.mostLikely, latest.mostLikely), bestCase: blend(t.bestCase, latest.bestCase) }
-          push(r, w, t, 'Based on the deals I expect to progress this quarter')
+          const s = Math.pow(0.985, q.weeksElapsed - w) * (1 + rng.normal(0, 0.008))
+          const f = (v: number) => Math.round(c + Math.max(0, v - c) * s)
+          push(r, w, { commit: f(latest.commit), mostLikely: f(latest.mostLikely), bestCase: f(latest.bestCase) }, 'Based on the deals I expect to progress this quarter')
           continue
         }
         if (rng.chance(0.12)) {
@@ -125,8 +124,8 @@ function seedQuarter(ds: Dataset, q: Quarter, qi: number, rng: Rng, profiles: Ma
         const openCall = open * hw * (1 + rng.normal(0, 0.03))
         const taper = Math.min(1, Math.max(0, (13 - w) / 7))
         const commit = c + openCall
-        const ml = commit + 0.27 * Math.max(0, openCall) * taper
-        const bc = ml + 0.5 * Math.max(0, openCall) * taper
+        const ml = commit + 0.15 * Math.max(0, openCall) * taper
+        const bc = ml + 0.35 * Math.max(0, openCall) * taper
         push(r, w, { commit: Math.round(commit), mostLikely: Math.round(ml), bestCase: Math.round(bc) })
       }
     }
@@ -144,10 +143,13 @@ function seedQuarter(ds: Dataset, q: Quarter, qi: number, rng: Rng, profiles: Ma
         const c = closedFor(w, ids)
         let T: CallTriple
         if (q.isCurrent) {
+          // Managers and above lean on the model: its week-6 expectation, eased in over earlier weeks.
+          const target6 = modelForReps(ds, qi, q.weeksElapsed, ids).p50 * MODEL_LEAN
+          const t = c + (target6 - c) * Math.pow(0.985, q.weeksElapsed - w)
           T = {
-            commit: c + (S.commit - c) * CURRENT_KAPPA.commit,
-            mostLikely: c + (S.mostLikely - c) * CURRENT_KAPPA.mostLikely,
-            bestCase: c + (S.bestCase - c) * CURRENT_KAPPA.bestCase,
+            commit: c + (t - c) * HONEST.commit,
+            mostLikely: t,
+            bestCase: c + (t - c) * HONEST.bestCase,
           }
         } else {
           const A = ids.reduce((a, id) => a + (q.actuals!.byPerson[id] ?? 0), 0)

@@ -78,7 +78,7 @@ describe('deadlines and weeks', () => {
   })
 })
 
-describe('calibration targets (week 6, seed 42, generous tolerances)', () => {
+describe('calibration targets (week 6, seed 42)', () => {
   const board = api.boardView(ds, input)
   const cro = api.croView(ds, input)
   const priya = api.teamView(ds, input, 'priya-raman')
@@ -89,39 +89,57 @@ describe('calibration targets (week 6, seed 42, generous tolerances)', () => {
     expect(plan).toEqual({ SMB: 3_600_000, MM: 2_800_000, ENT: 2_600_000 })
   })
 
-  it('CRO call and model range', () => {
-    expect(within(board.call.mostLikely, 8_600_000, 0.12)).toBe(true)
-    expect(within(board.call.commit, 7_600_000, 0.12)).toBe(true)
-    expect(within(board.call.bestCase, 9_600_000, 0.15)).toBe(true)
-    expect(within(board.model.p10, 7_600_000, 0.1)).toBe(true)
-    expect(within(board.model.p90, 9_200_000, 0.12)).toBe(true)
+  it('CRO call sits just under plan and the model sits close to it', () => {
+    expect(within(board.call.mostLikely, 8_600_000, 0.07)).toBe(true)
+    expect(board.call.mostLikely / board.plan).toBeGreaterThan(0.94)
+    expect(board.call.mostLikely / board.plan).toBeLessThan(0.99)
+    expect(within(board.call.commit, 7_750_000, 0.07)).toBe(true)
+    expect(within(board.call.bestCase, 9_600_000, 0.07)).toBe(true)
+    expect(within(board.model.p50, 8_550_000, 0.07)).toBe(true)
+    expect(board.model.p50).toBeLessThan(board.call.mostLikely)
   })
 
-  it('Priya Raman\'s team', () => {
+  it('every segment lands slightly under plan', () => {
+    for (const s of cro.segments) {
+      expect(s.call.mostLikely / s.plan).toBeGreaterThan(0.91)
+      expect(s.call.mostLikely / s.plan).toBeLessThan(1.0)
+    }
+  })
+
+  it('Priya Raman\'s team follows the prototype', () => {
     expect(priya.pathToPlan.plan).toBe(1_200_000)
-    expect(within(priya.pathToPlan.closed, 283_000, 0.1)).toBe(true)
-    expect(within(priya.reportsSum.commit, 840_000, 0.1)).toBe(true)
-    expect(within(priya.model.p50, 812_000, 0.15)).toBe(true)
+    expect(within(priya.pathToPlan.closed, 283_000, 0.07)).toBe(true)
+    expect(within(priya.reportsSum.commit, 840_000, 0.07)).toBe(true)
+    expect(within(priya.model.p50, 812_000, 0.05)).toBe(true)
     expect(priya.atRiskCommits).toHaveLength(4)
     expect(within(priya.atRiskCommits.reduce((a, r) => a + r.deal.amount, 0), 123_000, 0.02)).toBe(true)
-    const commits = Object.fromEntries(priya.rows.map((r) => [r.person.name, r.call.commit]))
-    expect(within(commits['Marcus Lee'], 210_000, 0.1)).toBe(true)
-    expect(within(commits['Ana Souza'], 205_000, 0.1)).toBe(true)
-    expect(within(commits['Tom Becker'], 150_000, 0.1)).toBe(true)
-    expect(within(commits['Grace Kim'], 190_000, 0.1)).toBe(true)
-    expect(within(commits['Diego Ruiz'], 85_000, 0.1)).toBe(true)
-    const ana = priya.rows.find((r) => r.person.name === 'Ana Souza')!
-    expect(ana.biasNote).toMatch(/lands at 8\d% of commit/)
-    expect(priya.rows.find((r) => r.person.name === 'Diego Ruiz')!.biasNote).toBeNull()
+    const row = (n: string) => priya.rows.find((r) => r.person.name === n)!
+    const commits: Record<string, number> = { 'Marcus Lee': 210_000, 'Ana Souza': 205_000, 'Tom Becker': 150_000, 'Grace Kim': 190_000, 'Diego Ruiz': 85_000 }
+    for (const [name, c] of Object.entries(commits)) expect(within(row(name).call.commit, c, 0.07)).toBe(true)
+    // model within 10% of commit for everyone except Ana, whose model is clearly below her commit
+    for (const name of ['Marcus Lee', 'Tom Becker', 'Grace Kim', 'Diego Ruiz']) {
+      expect(within(row(name).model, row(name).call.commit, 0.1)).toBe(true)
+      expect(row(name).warning).toBeNull()
+    }
+    expect(row('Ana Souza').model).toBeLessThan(0.88 * row('Ana Souza').call.commit)
+    expect(row('Ana Souza').warning).toMatch(/above model/)
+    expect(row('Ana Souza').biasNote).toMatch(/lands at 8\d% of commit/)
+    expect(row('Diego Ruiz').biasNote).toBeNull()
   })
 
-  it('bridge, KPIs', () => {
+  it('the board bridge adds up to the call', () => {
     const b = board.bridge
     expect(b.newArr + b.expansionArr - b.churnArr).toBe(board.call.mostLikely)
     expect(b.endingArr).toBe(b.startingArr + board.call.mostLikely)
     expect(b.startingArr).toBe(120_000_000)
-    expect(within(b.newArr, 6_100_000, 0.15)).toBe(true)
-    expect(within(b.expansionArr, 4_300_000, 0.15)).toBe(true)
+    expect(b.newArr).toBeGreaterThan(4_500_000)
+    expect(b.newArr).toBeLessThan(6_500_000)
+    expect(b.expansionArr).toBeGreaterThan(3_800_000)
+    expect(b.churnArr).toBeGreaterThan(800_000)
+    expect(b.churnArr).toBeLessThan(2_200_000)
+  })
+
+  it('KPIs are in believable ranges (fractions for %)', () => {
     const k = Object.fromEntries(board.kpis.map((x) => [x.id, x.value]))
     expect(k['nrr']).toBeGreaterThan(1.05)
     expect(k['nrr']).toBeLessThan(1.2)
@@ -130,7 +148,17 @@ describe('calibration targets (week 6, seed 42, generous tolerances)', () => {
     expect(k['credit-utilisation']).toBeGreaterThan(0.66)
     expect(k['credit-utilisation']).toBeLessThan(0.82)
     expect(k['coverage']).toBeGreaterThan(2.5)
-    expect(k['coverage']).toBeLessThan(3.5)
+    expect(k['coverage']).toBeLessThan(3.6)
+  })
+
+  it('the CRO call moves gently from week to week', () => {
+    const calls = board.trend.filter((p) => p.call !== null).map((p) => p.call as number)
+    expect(calls).toHaveLength(6)
+    for (let i = 1; i < calls.length; i++) expect(Math.abs(calls[i] / calls[i - 1] - 1)).toBeLessThan(0.045)
+  })
+
+  it('week-over-week deal changes are in the tens, not hundreds', () => {
+    for (const c of cro.wow.changes) expect(c.dealCount).toBeLessThan(60)
   })
 
   it('views are fast after first load', () => {
@@ -140,6 +168,40 @@ describe('calibration targets (week 6, seed 42, generous tolerances)', () => {
     api.teamView(ds, input, 'priya-raman')
     api.repView(ds, input, 'ana-souza')
     expect(performance.now() - t0).toBeLessThan(150)
+  })
+})
+
+describe('data hygiene', () => {
+  it('every person has a sensible bias and error; no rep has a negative quarter', () => {
+    const v = api.accuracyView(ds)
+    for (const p of v.people) {
+      expect(p.bias.commitRatio, p.person.name).toBeGreaterThan(0.75)
+      expect(p.bias.commitRatio, p.person.name).toBeLessThan(1.15)
+      expect(p.mape, p.person.name).toBeLessThan(0.4)
+    }
+    for (const q of ds.quarters.slice(0, 4)) {
+      for (const r of ds.org.people.filter((x) => x.role === 'rep')) {
+        if (r.name === 'Diego Ruiz' && q.id < '2026-Q3') continue
+        expect(q.actuals!.byPerson[r.id], `${r.name} ${q.id}`).toBeGreaterThan(0)
+      }
+    }
+  })
+
+  it('titles, deal names and accounts read cleanly', () => {
+    expect(ds.org.people.filter((p) => p.role === 'rep').every((p) => p.title === 'Account Executive')).toBe(true)
+    const snap = ds.quarters[4].snapshots[5]
+    for (const d of snap.deals) {
+      expect(d.name).toContain(' — ')
+      expect(d.accountName).not.toMatch(/\d$/)
+      expect(d.name).not.toMatch(/\d$/)
+    }
+    for (const r of ds.org.people.filter((p) => p.role === 'rep')) {
+      const counts = new Map<string, number>()
+      for (const d of snap.deals) {
+        if (d.ownerId === r.id && d.stage !== 'Closed Won' && d.stage !== 'Closed Lost') counts.set(d.accountId, (counts.get(d.accountId) ?? 0) + 1)
+      }
+      for (const n of counts.values()) expect(n).toBeLessThanOrEqual(2)
+    }
   })
 })
 
