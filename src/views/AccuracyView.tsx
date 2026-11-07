@@ -45,6 +45,7 @@ function Stat({ label, value, note }: { label: string; value: string; note: stri
 // ───────────────────────── accuracy by week ─────────────────────────
 
 function ByWeek({ byWeek }: { byWeek: { level: ChainStep['level']; points: { week: number; ratio: number }[] }[] }) {
+  const finalRank = [...byWeek].sort((a, b) => b.points[b.points.length - 1].ratio - a.points[a.points.length - 1].ratio).map((l) => l.level)
   const data = useMemo(
     () => Array.from({ length: 13 }, (_, i) => {
       const row: Record<string, number> = { week: i + 1 }
@@ -65,7 +66,7 @@ function ByWeek({ byWeek }: { byWeek: { level: ChainStep['level']; points: { wee
             <CartesianGrid stroke="#F0F2F5" vertical={false} />
             <XAxis dataKey="week" tickFormatter={(w) => `W${w}`} tick={{ fontSize: 12, fill: '#5D6B7E' }} axisLine={{ stroke: '#C9D1DB' }} tickLine={false} />
             <YAxis
-              domain={[0.7, 1.05]} ticks={[0.7, 0.8, 0.9, 1.0]} tickFormatter={(v: number) => v.toFixed(2)}
+              domain={[0.8, 1.05]} ticks={[0.8, 0.9, 1.0]} tickFormatter={(v: number) => v.toFixed(2)}
               tick={{ fontSize: 12, fill: '#5D6B7E', fontFamily: 'Geist Mono, monospace' }} axisLine={false} tickLine={false} width={44}
             />
             <ReferenceLine y={1} stroke="#101828" strokeDasharray="5 4" label={{ value: 'Call = actual', position: 'insideBottomLeft', fontSize: 12, fill: '#5D6B7E' }} />
@@ -79,7 +80,7 @@ function ByWeek({ byWeek }: { byWeek: { level: ChainStep['level']; points: { wee
                 dot={false} activeDot={{ r: 4 }} isAnimationActive={false}
                 label={(p: { x?: number | string; y?: number | string; index?: number }) =>
                   p.index === 12 && p.x != null && p.y != null ? (
-                    <text key={l.level} x={Number(p.x) + 10} y={Number(p.y) + 4 + (['Reps', 'Managers', 'Directors', 'CRO'].indexOf(l.level) - 1.5) * 4} fontSize={13} fontWeight={600} fill={LEVEL_COLOR[l.level]}>{l.level}</text>
+                    <text key={l.level} x={Number(p.x) + 10} y={Number(p.y) + 4 + (finalRank.indexOf(l.level) - 1.5) * 15} fontSize={13} fontWeight={600} fill={LEVEL_COLOR[l.level]}>{l.level}</text>
                   ) : <g key={`${l.level}-${p.index}`} />
                 }
               />

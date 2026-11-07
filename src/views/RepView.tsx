@@ -7,6 +7,7 @@ import { ds } from '../ui/dataset'
 import { money, pct, shortDate, times } from '../ui/format'
 import { useSelectedPerson, useViewInput } from '../ui/hooks'
 import { Card, CardTitle, DeadlinePill, PageHeader, Segmented } from '../ui/kit'
+import { ModelRangeChart } from '../ui/ModelRangeChart'
 import { PathToPlanBar } from '../ui/PathToPlanBar'
 
 type SortKey = 'amount' | 'close' | 'win' | 'stage'
@@ -64,7 +65,7 @@ function RepBody({ personId }: { personId: string }) {
 
       <Card labelledBy="quota-h" className="flex flex-col gap-6 px-7 py-6">
         <div className="flex flex-wrap items-baseline gap-x-3.5 gap-y-1">
-          <h2 id="quota-h" className="num m-0 text-[40px] font-semibold tracking-[-0.02em]">{money(v.closed)}</h2>
+          <h2 id="quota-h" className="m-0 text-[40px] tabular-nums font-semibold tracking-[-0.02em]">{money(v.closed)}</h2>
           <span className="text-base text-muted">
             closed so far, toward a <span className="font-semibold text-ink">{money(v.quota)}</span> quota
             <span className="text-muted"> ({pct(v.closed / v.quota)})</span>
@@ -72,7 +73,7 @@ function RepBody({ personId }: { personId: string }) {
         </div>
         <PathToPlanBar
           plan={v.quota} planLabel="Quota" gapLabel="Gap to quota" closed={v.closed} committedOpen={Math.max(0, commit - v.closed)}
-          gap={Math.max(0, v.quota - commit)} model={v.model} callValue={draft.commit}
+          gap={Math.max(0, v.quota - commit)} callValue={draft.commit}
         />
         <dl className="m-0 grid grid-cols-1 gap-4 border-t border-[#F0F2F5] pt-5 sm:grid-cols-3">
           <Stat
@@ -88,6 +89,11 @@ function RepBody({ personId }: { personId: string }) {
           <Stat label="Model for your book" value={money(v.model.p50)} note={`likely range ${money(v.model.p10)}–${money(v.model.p90)}`} />
         </dl>
       </Card>
+
+      <ModelRangeChart
+        title="Where the model thinks your quarter lands" range={v.model} plan={v.quota} planLabel="Quota"
+        marks={[{ label: 'Your call', value: draft.commit }]}
+      />
 
       <div className="flex flex-wrap items-start gap-6">
         <Card labelledBy="deals-h" className="flex min-w-0 flex-[999_1_620px] flex-col gap-4 px-7 pb-4 pt-[22px]">

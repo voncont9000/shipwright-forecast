@@ -7,6 +7,7 @@ import { ds } from '../ui/dataset'
 import { money, moneyPrecise, signedMoney, times } from '../ui/format'
 import { useViewInput } from '../ui/hooks'
 import { Card, CardTitle, DeadlinePill, PageHeader } from '../ui/kit'
+import { MiniRange, ModelRangeChart, domainOf } from '../ui/ModelRangeChart'
 import { PathToPlanBar } from '../ui/PathToPlanBar'
 
 export function CroView() {
@@ -29,16 +30,21 @@ function CroBody() {
 
       <Card labelledBy="cro-path-h" className="flex flex-col gap-[22px] px-7 py-6">
         <div className="flex flex-wrap items-baseline gap-x-3.5 gap-y-1">
-          <h2 id="cro-path-h" className="num m-0 text-[40px] font-semibold tracking-[-0.02em]">{money(v.reportsSum.commit)}</h2>
+          <h2 id="cro-path-h" className="m-0 text-[40px] tabular-nums font-semibold tracking-[-0.02em]">{money(v.reportsSum.commit)}</h2>
           <span className="text-base text-muted">
             committed by your directors, toward a <span className="font-semibold text-ink">{money(v.plan)}</span> plan
           </span>
         </div>
         <PathToPlanBar
           plan={v.plan} closed={closed} committedOpen={Math.max(0, v.reportsSum.commit - closed)}
-          gap={Math.max(0, v.plan - v.reportsSum.commit)} model={v.model} callValue={draft.commit}
+          gap={Math.max(0, v.plan - v.reportsSum.commit)} callValue={draft.commit}
         />
       </Card>
+
+      <ModelRangeChart
+        title="Where the model thinks the quarter lands" range={v.model} plan={v.plan}
+        marks={[{ label: "Directors' commit", value: v.reportsSum.commit }, ...(draft.commit !== v.reportsSum.commit ? [{ label: 'Your call', value: draft.commit }] : [])]}
+      />
 
       <div className="flex flex-wrap items-start gap-6">
         <div className="flex min-w-0 flex-[999_1_620px] flex-col gap-6">
@@ -66,7 +72,7 @@ function Segments({ rows }: { rows: SegmentRow[] }) {
     <Card labelledBy="seg-h" className="flex flex-col gap-2 px-7 pb-3 pt-[22px]">
       <CardTitle
         id="seg-h" title="Plan, call and model by segment"
-        sub="Grey band is the model range, the blue dot is the Director's call, the black tick is plan."
+        sub="Band is the model's likely range, the grey tick its median, the dot the Director's most likely call, the black tick plan."
       />
       <div className="overflow-x-auto">
         <div className="min-w-[640px]">
@@ -81,10 +87,7 @@ function Segments({ rows }: { rows: SegmentRow[] }) {
 }
 
 function SegmentLine({ row }: { row: SegmentRow }) {
-  const lows = [row.model.p10, row.call.mostLikely, row.plan]
-  const lo = Math.min(...lows) * 0.93
-  const hi = Math.max(row.model.p90, row.call.mostLikely, row.plan) * 1.04
-  const pos = (v: number) => `${(((v - lo) / (hi - lo)) * 100).toFixed(2)}%`
+  const domain = domainOf([row.model.p10, row.model.p90, row.call.mostLikely, row.plan], 0.08)
   const behind = row.call.mostLikely < row.plan
   return (
     <div className="grid grid-cols-[minmax(130px,1fr)_72px_minmax(180px,2fr)_84px] items-center gap-5 border-t border-[#F0F2F5] py-4">
@@ -100,16 +103,10 @@ function SegmentLine({ row }: { row: SegmentRow }) {
             {signedMoney(row.call.mostLikely - row.plan, 'on plan')}{row.call.mostLikely !== row.plan ? ' vs plan' : ''}
           </span>
         </div>
-        <div
-          className="relative h-5" role="img"
-          aria-label={`${SEGMENT_LABEL[row.segment]}: model ${money(row.model.p10)} to ${money(row.model.p90)}, call ${money(row.call.mostLikely)}, plan ${money(row.plan)}`}
-        >
-          <div className="absolute inset-x-0 top-[9px] h-0.5 bg-[#EEF1F5]" />
-          <div className="absolute top-1 h-3 rounded-md bg-[#E4E8EE]" style={{ left: pos(row.model.p10), width: `${(((row.model.p90 - row.model.p10) / (hi - lo)) * 100).toFixed(2)}%` }} />
-          <div className="absolute top-[3px] -ml-[1.5px] h-3.5 w-[3px] rounded-[1px] bg-[#8A96A8]" style={{ left: pos(row.model.p50) }} />
-          <div className="absolute -top-0.5 -ml-px h-6 w-0.5 bg-ink" style={{ left: pos(row.plan) }} />
-          <div className="absolute top-[3px] -ml-[7px] size-3.5 rounded-full border-2 border-white bg-accent shadow-[0_0_0_1px_#2457D6]" style={{ left: pos(row.call.mostLikely) }} />
-        </div>
+        <MiniRange
+          range={row.model} value={row.call.mostLikely} domain={domain} plan={row.plan} tone="accent"
+          ariaLabel={`${SEGMENT_LABEL[row.segment]}: model ${money(row.model.p10)} to ${money(row.model.p90)}, call ${money(row.call.mostLikely)}, plan ${money(row.plan)}`}
+        />
         <div className="num flex justify-between text-[11px] text-muted">
           <span>{money(row.model.p10)}</span><span>{money(row.model.p90)}</span>
         </div>
@@ -179,7 +176,7 @@ const KIND_LABEL: Record<WowKind, string> = {
 function Wow({ from, to, changes }: { from: number; to: number; changes: WowChange[] }) {
   const rows = useMemo(() => {
     let run = from
-    const mid = changes.map((c) => {
+    const mid = changes.filter((c) => Math.abs(c.amount) >= 1000 || c.kind === "new").map((c) => {
       const start = run
       run += c.amount
       return { key: c.kind, label: KIND_LABEL[c.kind], a: start, b: run, value: signedMoney(c.amount, '$0'), count: c.dealCount, kind: 'delta' as const }

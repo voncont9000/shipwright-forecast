@@ -5,6 +5,7 @@ import { api } from '../ui/api'
 import { ds } from '../ui/dataset'
 import { MINUS, millions, niceMax, pct, signedMillions, times } from '../ui/format'
 import { useViewInput } from '../ui/hooks'
+import { ModelRangeChart } from '../ui/ModelRangeChart'
 import { Card, CheckIcon } from '../ui/kit'
 
 /** Board screen (prototype: Board.dc.html). */
@@ -21,7 +22,7 @@ export function BoardView() {
             {v.quarterLabel.split(' ')[0]} net new ARR · CRO's most likely call
           </h1>
           <div className="flex flex-wrap items-baseline gap-x-3.5 gap-y-1.5">
-            <span className="num text-[56px] font-semibold leading-[1.05] tracking-[-0.03em]">{millions(v.call.mostLikely)}</span>
+            <span className="text-[56px] tabular-nums font-semibold leading-[1.05] tracking-[-0.03em]">{millions(v.call.mostLikely)}</span>
             <span className={`rounded-full px-2.5 py-1 text-sm font-semibold ${attain >= 1 ? 'bg-[#E4F4EC] text-good' : 'bg-warn-soft text-[#8A3F06]'}`}>
               {pct(attain)} of {millions(v.plan)} plan
             </span>
@@ -32,9 +33,14 @@ export function BoardView() {
           </span>
         </div>
         <div className="flex min-w-0 flex-[1.3_1_460px] flex-col gap-1.5">
-          <RangeGraphic call={v.call} plan={v.plan} model={v.model} />
+          <RangeGraphic call={v.call} plan={v.plan} />
         </div>
       </Card>
+
+      <ModelRangeChart
+        title="Where the model thinks the quarter lands" range={v.model} plan={v.plan}
+        marks={[{ label: "CRO's call", value: v.call.mostLikely }]}
+      />
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(440px,1fr))] gap-6">
         <Waterfall bridge={v.bridge} plan={v.plan} net={v.call.mostLikely} />
@@ -69,8 +75,12 @@ export function BoardView() {
         </div>
       </Card>
 
-      <section aria-label="Health metrics" className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
-        {v.kpis.map((k) => <KpiCard key={k.id} kpi={k} />)}
+      <section aria-label="Health metrics" className="flex flex-col gap-4">
+        {kpiRows(v.kpis).map((row, i) => (
+          <div key={i} className="grid gap-4" style={{ gridTemplateColumns: `repeat(${row.length}, minmax(0, 1fr))` }}>
+            {row.map((k) => <KpiCard key={k.id} kpi={k} />)}
+          </div>
+        ))}
       </section>
     </main>
   )
@@ -78,16 +88,16 @@ export function BoardView() {
 
 // ───────────────────────── range graphic ─────────────────────────
 
-function RangeGraphic({ call, plan, model }: { call: CallTriple; plan: number; model: ModelRange }) {
+function RangeGraphic({ call, plan }: { call: CallTriple; plan: number }) {
   const half = 500_000
-  const lo = Math.floor((Math.min(call.commit, model.p10, plan) - half) / half) * half
-  const hi = Math.ceil((Math.max(call.bestCase, model.p90, plan) + half) / half) * half
+  const lo = Math.floor((Math.min(call.commit, plan) - half) / half) * half
+  const hi = Math.ceil((Math.max(call.bestCase, plan) + half) / half) * half
   const pos = (x: number) => ((x - lo) / (hi - lo)) * 100
   const labels: [string, number, boolean][] = [['Commit', call.commit, false], ['Most likely', call.mostLikely, true], ['Best case', call.bestCase, false]]
   return (
     <div
-      className="relative h-[146px]" role="img"
-      aria-label={`Range: commit ${millions(call.commit)}, most likely ${millions(call.mostLikely)}, best case ${millions(call.bestCase)}. Plan ${millions(plan)}. Model range ${millions(model.p10)} to ${millions(model.p90)}.`}
+      className="relative h-[108px]" role="img"
+      aria-label={`Range: commit ${millions(call.commit)}, most likely ${millions(call.mostLikely)}, best case ${millions(call.bestCase)}. Plan ${millions(plan)}.`}
     >
       <div className="absolute top-0 -translate-x-1/2 whitespace-nowrap rounded-[5px] bg-[#F0F2F5] px-2 py-px text-[13px] font-semibold" style={{ left: `${pos(plan)}%` }}>
         Plan {millions(plan)}
@@ -99,13 +109,6 @@ function RangeGraphic({ call, plan, model }: { call: CallTriple; plan: number; m
         style={{ left: `${pos(call.commit)}%`, width: `${pos(call.bestCase) - pos(call.commit)}%` }}
       />
       <div className="absolute top-[34px] -ml-0.5 h-7 w-1 rounded-sm bg-accent" style={{ left: `${pos(call.mostLikely)}%` }} />
-      <div
-        className="absolute top-[112px] box-border h-2 rounded-b-[3px] border-[1.5px] border-t-0 border-[#8A96A8]"
-        style={{ left: `${pos(model.p10)}%`, width: `${pos(model.p90) - pos(model.p10)}%` }}
-      />
-      <div className="absolute top-[124px] -translate-x-1/2 whitespace-nowrap text-[13px] text-muted" style={{ left: `${(pos(model.p10) + pos(model.p90)) / 2}%` }}>
-        Model range {millions(model.p10)}–{millions(model.p90)}
-      </div>
       {labels.map(([label, value, strong]) => (
         <div key={label} className="absolute top-[72px] flex -translate-x-1/2 flex-col items-center leading-[1.3]" style={{ left: `${pos(value)}%` }}>
           <span className="text-xs text-muted">{label}</span>
@@ -261,6 +264,13 @@ function Trend({ trend, plan, week }: { trend: TrendPoint[]; plan: number; week:
 
 // ───────────────────────── KPIs ─────────────────────────
 
+/** Split KPIs into balanced rows (7 becomes 4 + 3) so there is never an orphan row. */
+function kpiRows(kpis: Kpi[]): Kpi[][] {
+  if (kpis.length <= 4) return [kpis]
+  const first = Math.ceil(kpis.length / 2)
+  return [kpis.slice(0, first), kpis.slice(first)]
+}
+
 const LOWER_IS_BETTER = new Set<Kpi['id']>(['cycle-days'])
 
 function fmtKpi(k: Kpi): { value: string; delta: string; good: boolean | null } {
@@ -275,6 +285,7 @@ function fmtKpi(k: Kpi): { value: string; delta: string; good: boolean | null } 
     const sign = c > 0 ? '+' : MINUS
     const mag = Math.abs(c)
     const num = k.unit === 'x' ? mag.toFixed(1) : String(Math.round(mag))
+    if (Number(num) === 0) return { value, delta: 'no change', good: null }
     delta = `${sign}${num}${k.unit === '%' ? (Math.round(mag) === 1 ? ' pt' : ' pts') : k.unit === 'x' ? '×' : ' days'} vs last quarter`
     good = LOWER_IS_BETTER.has(k.id) ? c < 0 : c > 0
   } else if (k.target != null) {

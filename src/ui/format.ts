@@ -21,7 +21,7 @@ export function moneyPrecise(v: number): string {
 
 /** +$28k / −$1.8M. Near-zero renders as the `zero` text (default "same"). */
 export function signedMoney(v: number, zero = 'same'): string {
-  if (Math.abs(v) < 500) return zero
+  if (Math.abs(v) < 1000) return zero
   return `${v > 0 ? '+' : MINUS}${money(Math.abs(v))}`
 }
 

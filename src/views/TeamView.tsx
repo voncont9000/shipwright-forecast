@@ -6,6 +6,8 @@ import { ds } from '../ui/dataset'
 import { money, shortDate, signedMoney } from '../ui/format'
 import { useSelectedPerson, useViewInput, personName } from '../ui/hooks'
 import { Avatar, Card, CardTitle, DeadlinePill, PageHeader, WarnIcon } from '../ui/kit'
+import { MiniRange, ModelRangeChart, domainOf } from '../ui/ModelRangeChart'
+import type { RangeMark } from '../ui/ModelRangeChart'
 import { PathToPlanBar } from '../ui/PathToPlanBar'
 import { useStore } from '../ui/store'
 
@@ -22,6 +24,7 @@ function TeamBody({ role, personId }: { role: 'manager' | 'director'; personId: 
   const v = useMemo(() => api.teamView(ds, input, personId), [input, personId])
   const [draft, setDraft] = useState<CallTriple>(v.ownCall ?? v.reportsSum)
 
+  const [showAllRisk, setShowAllRisk] = useState(false)
   const noun = role === 'manager' ? 'reps' : 'managers'
   const target = role === 'manager' ? 'Director' : 'CRO'
   const callValue = draft.commit
@@ -29,12 +32,12 @@ function TeamBody({ role, personId }: { role: 'manager' | 'director'; personId: 
   const riskTotal = risk.reduce((s, r) => s + r.deal.amount, 0)
   const drillRole = role === 'manager' ? 'rep' : 'manager'
 
-  const scale = useMemo(() => {
-    const top = Math.max(1, ...v.rows.flatMap((r) => [r.call.commit, r.model, r.likelyToLand ?? 0]))
-    const step = top > 2_000_000 ? 250_000 : 25_000
-    return Math.ceil((top * 1.1) / step) * step
-  }, [v.rows])
-  const anyLanding = v.rows.some((r) => r.likelyToLand != null)
+  const domain = useMemo(
+    () => domainOf(v.rows.flatMap((r) => [r.call.commit, r.modelRange.p10, r.modelRange.p90]), 0.1),
+    [v.rows],
+  )
+  const marks: RangeMark[] = [{ label: `${noun === 'reps' ? "Reps'" : "Managers'"} commit`, value: v.reportsSum.commit }]
+  if (draft.commit !== v.reportsSum.commit) marks.push({ label: 'Your call', value: draft.commit })
 
   return (
     <main className="mx-auto flex max-w-[1280px] flex-col gap-6 px-8 pb-16 pt-8">
@@ -47,7 +50,7 @@ function TeamBody({ role, personId }: { role: 'manager' | 'director'; personId: 
       <Card labelledBy="path-h" className="flex flex-col gap-[22px] px-7 py-6">
         <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
           <div className="flex flex-wrap items-baseline gap-x-3.5 gap-y-1">
-            <h2 id="path-h" className="num m-0 text-[40px] font-semibold tracking-[-0.02em]">{money(v.reportsSum.commit)}</h2>
+            <h2 id="path-h" className="m-0 text-[40px] tabular-nums font-semibold tracking-[-0.02em]">{money(v.reportsSum.commit)}</h2>
             <span className="text-base text-muted">
               committed by your {noun}, toward a <span className="font-semibold text-ink">{money(v.pathToPlan.plan)}</span> plan
             </span>
@@ -59,29 +62,28 @@ function TeamBody({ role, personId }: { role: 'manager' | 'director'; personId: 
         </div>
         <PathToPlanBar
           plan={v.pathToPlan.plan} closed={v.pathToPlan.closed} committedOpen={v.pathToPlan.committedOpen}
-          gap={v.pathToPlan.gap} model={v.model} callValue={callValue}
+          gap={v.pathToPlan.gap} callValue={callValue}
         />
       </Card>
+
+      <ModelRangeChart title="Where the model thinks the quarter lands" range={v.model} plan={v.pathToPlan.plan} marks={marks} />
 
       <div className="flex flex-wrap items-start gap-6">
         <div className="flex min-w-0 flex-[999_1_620px] flex-col gap-6">
           <Card labelledBy="reps-h" className="flex flex-col gap-2 px-7 pb-3 pt-[22px]">
             <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1.5">
               <h2 id="reps-h" className="m-0 text-[17px] font-semibold">{role === 'manager' ? 'Rep calls' : 'Manager calls'}</h2>
-              <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[13px] text-muted">
-                <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-accent" />Commit</span>
-                {anyLanding && (
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="box-border size-2.5 rounded-full border-2 border-ink" />Likely to land, given their record
-                  </span>
-                )}
-                <span className="inline-flex items-center gap-1.5"><span className="h-3 w-[3px] bg-[#8A96A8]" />Model</span>
-              </div>
             </div>
             <div className="overflow-x-auto">
               <div className="min-w-[600px]">
+                <div className={`grid ${ROW_COLS} gap-5 pb-1 pt-1 text-xs font-medium uppercase tracking-wide text-muted`}>
+                  <span>{role === 'manager' ? 'Rep' : 'Manager'}</span>
+                  <span className="text-right">Commit</span>
+                  <span className="normal-case tracking-normal">Commit (dot) against the model's likely range (band)</span>
+                  <span />
+                </div>
                 {v.rows.map((r) => (
-                  <RepRow key={r.person.id} row={r} scale={scale} onOpen={() => viewAs(drillRole, r.person.id)} />
+                  <RepRow key={r.person.id} row={r} domain={domain} onOpen={() => viewAs(drillRole, r.person.id)} />
                 ))}
               </div>
             </div>
@@ -94,7 +96,12 @@ function TeamBody({ role, personId }: { role: 'manager' | 'director'; personId: 
                 ? `${risk.length} deal${risk.length > 1 ? 's' : ''} worth ${money(riskTotal)} ${risk.length > 1 ? 'are' : 'is'} marked Commit but break${risk.length > 1 ? '' : 's'} a commit rule`
                 : 'Every deal marked Commit passes the six commit rules'}
             />
-            {risk.map((r) => <RiskRow key={r.deal.id} row={r} onOpen={() => viewAs('rep', r.deal.ownerId)} />)}
+            {(showAllRisk ? risk : risk.slice(0, 6)).map((r) => <RiskRow key={r.deal.id} row={r} onOpen={() => viewAs('rep', r.deal.ownerId)} />)}
+            {risk.length > 6 && (
+              <button type="button" onClick={() => setShowAllRisk(!showAllRisk)} className="cursor-pointer self-start border-0 bg-transparent p-0 pb-2 pt-1 text-sm text-accent underline">
+                {showAllRisk ? 'Show fewer' : `Show all ${risk.length}, largest first`}
+              </button>
+            )}
           </Card>
         </div>
 
@@ -113,16 +120,11 @@ function TeamBody({ role, personId }: { role: 'manager' | 'director'; personId: 
   )
 }
 
-function RepRow({ row, scale, onOpen }: { row: TeamRow; scale: number; onOpen: () => void }) {
-  const warn = row.warning
-  const note = warn ?? row.biasNote ?? 'On track'
-  const pos = (v: number) => `${Math.min(100, (v / scale) * 100).toFixed(1)}%`
-  const pts = [row.call.commit, row.model, ...(row.likelyToLand != null ? [row.likelyToLand] : [])]
-  const lo = Math.min(...pts)
-  const hi = Math.max(...pts)
-  const aria = `Commit ${money(row.call.commit)}, model ${money(row.model)}${row.likelyToLand != null ? `, likely to land ${money(row.likelyToLand)}` : ''}`
+const ROW_COLS = 'grid-cols-[minmax(150px,1.1fr)_80px_minmax(200px,2fr)_minmax(170px,1.3fr)]'
+
+function RepRow({ row, domain, onOpen }: { row: TeamRow; domain: [number, number]; onOpen: () => void }) {
   return (
-    <div className="grid grid-cols-[minmax(150px,1.1fr)_80px_minmax(200px,2fr)_minmax(170px,1.3fr)] items-center gap-5 border-t border-[#F0F2F5] py-3.5">
+    <div className={`grid ${ROW_COLS} items-center gap-5 border-t border-[#F0F2F5] py-3.5`}>
       <div className="flex items-center gap-2.5">
         <Avatar name={row.person.name} />
         <div className="flex min-w-0 flex-col leading-tight">
@@ -133,18 +135,13 @@ function RepRow({ row, scale, onOpen }: { row: TeamRow; scale: number; onOpen: (
         </div>
       </div>
       <div className="num text-right font-semibold">{money(row.call.commit)}</div>
-      <div className="relative h-6" role="img" aria-label={aria}>
-        <div className="absolute inset-x-0 top-[11px] h-0.5 bg-[#EEF1F5]" />
-        <div className="absolute top-[11px] h-0.5 bg-[#C9D1DB]" style={{ left: pos(lo), width: `${(((hi - lo) / scale) * 100).toFixed(1)}%` }} />
-        <div className="absolute top-1 -ml-[1.5px] h-4 w-[3px] rounded-[1px] bg-[#8A96A8]" style={{ left: pos(row.model) }} />
-        {row.likelyToLand != null && (
-          <div className="absolute top-[5px] -ml-[7px] box-border size-3.5 rounded-full border-2 border-ink bg-white" style={{ left: pos(row.likelyToLand) }} />
-        )}
-        <div className="absolute top-1.5 -ml-1.5 size-3 rounded-full bg-accent" style={{ left: pos(row.call.commit) }} />
-      </div>
-      <div className={`flex items-center gap-1.5 text-sm ${warn ? 'text-warn' : 'text-muted'}`}>
-        {warn && <WarnIcon />}
-        {note}
+      <MiniRange
+        range={row.modelRange} value={row.call.commit} domain={domain}
+        ariaLabel={`Commit ${money(row.call.commit)}, model likely range ${money(row.modelRange.p10)} to ${money(row.modelRange.p90)}`}
+      />
+      <div className="flex flex-col gap-0.5 text-sm leading-snug">
+        {row.warning && <span className="flex items-center gap-1.5 text-warn"><WarnIcon />{row.warning}</span>}
+        <span className="text-[13px] text-muted">{row.biasNote ?? (row.warning ? '' : 'On track')}</span>
       </div>
     </div>
   )
