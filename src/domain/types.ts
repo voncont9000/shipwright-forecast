@@ -282,6 +282,8 @@ export interface TeamRow {
   likelyToLand: number | null
   biasNote: string | null // e.g. 'lands at 86% of commit on average'
   model: number // p50 for this person's book
+  /** Full model range for this person's book (P10..P90). */
+  modelRange: ModelRange
   warning: string | null // e.g. 'Commit 18% above model'
   submitted: boolean
 }

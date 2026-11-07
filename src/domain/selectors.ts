@@ -157,6 +157,7 @@ function teamView(ds: Dataset, input: ViewInput, personId: string): TeamView {
       likelyToLand: bias ? Math.round(call.commit * bias.commitRatio) : null,
       biasNote: bias ? `lands at ${pct(bias.commitRatio)}% of commit on average` : null,
       model: model.p50,
+      modelRange: model,
       warning: warningFor(call.commit, model.p50),
       submitted: !!r,
     }
