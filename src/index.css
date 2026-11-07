@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+/* Design tokens taken from the approved prototype (docs/prototype). */
+@theme {
+  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, monospace;
+  --color-page: #F6F7F9;
+  --color-card: #FFFFFF;
+  --color-ink: #101828;
+  --color-muted: #5D6B7E;
+  --color-line: #E4E8EE;
+  --color-accent: #2457D6;
+  --color-accent-soft: #E8EEFC;
+  --color-warn: #A14A0B;
+  --color-warn-soft: #FDF1E7;
+  --color-churn: #E9A56A;
+  --color-good: #18794E;
+}
+
+html, body { background: var(--color-page); color: var(--color-ink); font-family: var(--font-sans); }
+.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }

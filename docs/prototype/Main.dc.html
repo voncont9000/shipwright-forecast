@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Manager forecast view</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F6F7F9}
+a{color:#2457D6}a:hover{color:#173C9C}
+input:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid #2457D6;outline-offset:2px}
+input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #F6F7F9; color: #101828; font-family: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 15px; line-height: 1.5">
+
+  <header style="background: #FFFFFF; border-bottom: 1px solid #E4E8EE">
+    <div style="max-width: 1280px; margin: 0 auto; padding: 12px 32px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px">
+      <div style="display: flex; align-items: center; gap: 10px; font-weight: 600">
+        <span style="width: 28px; height: 28px; border-radius: 7px; background: #101828; display: inline-flex; align-items: center; justify-content: center">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 18h16"></path><path d="M6 14l4-5 4 3 5-7"></path></svg>
+        </span>
+        Shipwright Forecast
+      </div>
+      <nav aria-label="View as" style="display: flex; gap: 2px; padding: 3px; background: #F0F2F5; border-radius: 9px; font-size: 14px; flex-wrap: wrap">
+        <a href="#" style="color: #5D6B7E; text-decoration: none; padding: 5px 12px; border-radius: 7px">Rep</a>
+        <a href="#" aria-current="page" style="color: #101828; background: #FFFFFF; text-decoration: none; padding: 5px 12px; border-radius: 7px; font-weight: 600; box-shadow: 0 1px 2px rgba(16,24,40,0.08)">Manager</a>
+        <a href="#" style="color: #5D6B7E; text-decoration: none; padding: 5px 12px; border-radius: 7px">Director</a>
+        <a href="#" style="color: #5D6B7E; text-decoration: none; padding: 5px 12px; border-radius: 7px">CRO</a>
+        <a href="Board.dc.html" style="color: #5D6B7E; text-decoration: none; padding: 5px 12px; border-radius: 7px">Board</a>
+      </nav>
+      <div style="margin-left: auto; display: flex; align-items: center; gap: 12px">
+        <span style="font-size: 14px; color: #5D6B7E">Q4 FY26</span>
+        <div style="display: flex; gap: 3px" aria-label="Week 6 of 13">
+          <sc-for list="{{weeks}}" as="w" hint-placeholder-count="13">
+            <span style="width: 6px; height: 16px; border-radius: 2px; background: {{w.color}}"></span>
+          </sc-for>
+        </div>
+        <span style="font-size: 14px; font-weight: 600">Week 6</span>
+      </div>
+    </div>
+  </header>
+
+  <main style="max-width: 1280px; margin: 0 auto; padding: 32px 32px 64px; display: flex; flex-direction: column; gap: 24px">
+
+    <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px">
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <h1 style="margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -0.01em">Mid-Market East</h1>
+        <span style="color: #5D6B7E">Priya Raman · 5 reps</span>
+      </div>
+      <span style="display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; color: #8A3F06; background: #FDF1E6; padding: 6px 12px; border-radius: 999px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+        Your call is due Tuesday 17:00
+      </span>
+    </div>
+
+    <section aria-labelledby="path-h" style="background: #FFFFFF; border: 1px solid #E4E8EE; border-radius: 14px; padding: 24px 28px; display: flex; flex-direction: column; gap: 22px">
+      <div style="display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px">
+        <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px">
+          <h2 id="path-h" style="margin: 0; font-family: 'Geist Mono', ui-monospace, monospace; font-size: 40px; font-weight: 600; letter-spacing: -0.02em">$840k</h2>
+          <span style="font-size: 16px; color: #5D6B7E">committed by your reps, toward a <span style="color: #101828; font-weight: 600">$1.20M</span> plan</span>
+        </div>
+        <span style="font-size: 14px; color: #5D6B7E"><span style="color: #101828; font-weight: 600">+$28k</span> since last week</span>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <div style="position: relative; height: 30px">
+          <div style="position: absolute; left: 58.75%; width: 18.75%; top: 18px; height: 8px; border: 1.5px solid #8A96A8; border-bottom: 0; border-radius: 3px 3px 0 0; box-sizing: border-box"></div>
+          <div style="position: absolute; left: 68.1%; top: 0; transform: translateX(-50%); font-size: 13px; color: #5D6B7E; white-space: nowrap">Model range $705k–$930k</div>
+        </div>
+        <div style="position: relative; height: 22px; border-radius: 6px; overflow: hidden; background: repeating-linear-gradient(135deg, #F0F2F5 0 6px, #E4E8EE 6px 7px)" role="img" aria-label="Closed 283 thousand, committed but open 557 thousand, gap to plan 360 thousand. Model range 705 to 930 thousand.">
+          <div style="position: absolute; left: 0; top: 0; bottom: 0; width: 23.6%; background: {{accent}}"></div>
+          <div style="position: absolute; left: 23.6%; top: 0; bottom: 0; width: 46.4%; background: {{accentSoft}}"></div>
+          <div style="position: absolute; left: {{callPos}}; top: -2px; bottom: -2px; width: 3px; margin-left: -1.5px; background: #101828"></div>
+        </div>
+        <div style="position: relative; height: 22px">
+          <div style="position: absolute; left: {{callPos}}; top: 0; transform: translateX(-50%); font-size: 13px; font-weight: 600; white-space: nowrap">Your call {{commitLabel}}</div>
+          <div style="position: absolute; right: 0; top: 0; font-size: 13px; font-weight: 600; color: #101828; white-space: nowrap; background: #F0F2F5; padding: 1px 8px; border-radius: 5px">Plan $1.20M</div>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 8px 28px; font-size: 14px; color: #5D6B7E">
+        <span style="display: inline-flex; align-items: center; gap: 8px"><span style="width: 12px; height: 12px; border-radius: 3px; background: {{accent}}"></span>Closed <span style="color: #101828; font-family: 'Geist Mono', ui-monospace, monospace; font-weight: 500">$283k</span></span>
+        <span style="display: inline-flex; align-items: center; gap: 8px"><span style="width: 12px; height: 12px; border-radius: 3px; background: {{accentSoft}}"></span>Committed, still open <span style="color: #101828; font-family: 'Geist Mono', ui-monospace, monospace; font-weight: 500">$557k</span></span>
+        <span style="display: inline-flex; align-items: center; gap: 8px"><span style="width: 12px; height: 12px; border-radius: 3px; background: repeating-linear-gradient(135deg, #F0F2F5 0 3px, #C9D1DB 3px 4px)"></span>Gap to plan <span style="color: #101828; font-family: 'Geist Mono', ui-monospace, monospace; font-weight: 500">$360k</span></span>      </div>
+    </section>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+
+      <div style="flex: 999 1 620px; min-width: 0; display: flex; flex-direction: column; gap: 24px">
+
+        <section aria-labelledby="reps-h" style="background: #FFFFFF; border: 1px solid #E4E8EE; border-radius: 14px; padding: 22px 28px 12px; display: flex; flex-direction: column; gap: 8px">
+          <div style="display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px">
+            <h2 id="reps-h" style="margin: 0; font-size: 17px; font-weight: 600">Rep calls</h2>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: #5D6B7E">
+              <span style="display: inline-flex; align-items: center; gap: 6px"><span style="width: 10px; height: 10px; border-radius: 50%; background: {{accent}}"></span>Commit</span>
+              <sc-if value="{{showBias}}" hint-placeholder-val="{{ true }}"><span style="display: inline-flex; align-items: center; gap: 6px"><span style="width: 10px; height: 10px; border-radius: 50%; border: 2px solid #101828; box-sizing: border-box"></span>Likely to land, given their record</span></sc-if>
+              <span style="display: inline-flex; align-items: center; gap: 6px"><span style="width: 3px; height: 12px; background: #8A96A8"></span>Model</span>
+            </div>
+          </div>
+          <div style="overflow-x: auto">
+            <div style="min-width: 600px">
+              <sc-for list="{{reps}}" as="r" hint-placeholder-count="5">
+                <div style="display: grid; grid-template-columns: minmax(150px, 1.1fr) 80px minmax(200px, 2fr) minmax(170px, 1.3fr); gap: 20px; padding: {{rowPad}} 0; border-top: 1px solid #F0F2F5; align-items: center">
+                  <div style="display: flex; align-items: center; gap: 10px">
+                    <span style="width: 30px; height: 30px; flex: none; border-radius: 50%; background: #EEF1F5; color: #344054; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center">{{r.initials}}</span>
+                    <span style="font-weight: 500">{{r.name}}</span>
+                  </div>
+                  <div style="text-align: right; font-family: 'Geist Mono', ui-monospace, monospace; font-weight: 600">{{r.commit}}</div>
+                  <div style="position: relative; height: 24px" role="img" aria-label="{{r.aria}}">
+                    <div style="position: absolute; left: 0; right: 0; top: 11px; height: 2px; background: #EEF1F5"></div>
+                    <div style="position: absolute; left: {{r.lo}}; width: {{r.span}}; top: 11px; height: 2px; background: #C9D1DB"></div>
+                    <div style="position: absolute; left: {{r.modelPos}}; top: 4px; width: 3px; height: 16px; margin-left: -1.5px; background: #8A96A8; border-radius: 1px"></div>
+                    <sc-if value="{{r.showAdj}}" hint-placeholder-val="{{ true }}">
+                      <div style="position: absolute; left: {{r.adjPos}}; top: 5px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; border: 2px solid #101828; box-sizing: border-box; background: #FFFFFF"></div>
+                    </sc-if>
+                    <div style="position: absolute; left: {{r.commitPos}}; top: 6px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: {{accent}}"></div>
+                  </div>
+                  <div style="font-size: 14px; color: {{r.noteColor}}; display: flex; align-items: center; gap: 6px">
+                    <sc-if value="{{r.warn}}" hint-placeholder-val="{{ false }}">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><path d="M12 3l9.5 17h-19z"></path><path d="M12 10v4"></path><path d="M12 17.5v.01"></path></svg>
+                    </sc-if>
+                    {{r.note}}
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </section>
+
+        <section aria-labelledby="risk-h" style="background: #FFFFFF; border: 1px solid #E4E8EE; border-radius: 14px; padding: 22px 28px 12px; display: flex; flex-direction: column; gap: 8px">
+          <div style="display: flex; flex-direction: column; gap: 2px">
+            <h2 id="risk-h" style="margin: 0; font-size: 17px; font-weight: 600">Check these commits before you call</h2>
+            <span style="font-size: 14px; color: #5D6B7E">4 deals worth $123k are marked Commit but break a commit rule</span>
+          </div>
+          <sc-for list="{{risks}}" as="d" hint-placeholder-count="4">
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px 20px; padding: {{rowPad}} 0; border-top: 1px solid #F0F2F5">
+              <div style="flex: 1 1 220px; display: flex; flex-direction: column">
+                <span style="font-weight: 500">{{d.account}}</span>
+                <span style="font-size: 13px; color: #5D6B7E">{{d.rep}} · closes {{d.close}}</span>
+              </div>
+              <span style="flex: 1 1 220px; font-size: 14px; color: #A14A0B">{{d.why}}</span>
+              <span style="font-family: 'Geist Mono', ui-monospace, monospace; font-weight: 600; min-width: 56px; text-align: right">{{d.amount}}</span>
+              <a href="#" style="font-size: 14px; font-weight: 500; text-decoration: none; padding: 8px 12px; border: 1px solid #E4E8EE; border-radius: 8px; color: #101828">Open deal</a>
+            </div>
+          </sc-for>
+        </section>
+      </div>
+
+      <aside aria-labelledby="call-h" style="flex: 1 1 320px; min-width: 0; background: #FFFFFF; border: 1px solid #E4E8EE; border-radius: 14px; padding: 24px; display: flex; flex-direction: column; gap: 18px">
+        <div style="display: flex; flex-direction: column; gap: 2px">
+          <h2 id="call-h" style="margin: 0; font-size: 17px; font-weight: 600">Your call to the Director</h2>
+          <span style="font-size: 14px; color: #5D6B7E">Your reps' numbers stay on record next to yours.</span>
+        </div>
+
+        <sc-for list="{{fields}}" as="f" hint-placeholder-count="3">
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <label for="{{f.id}}" style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px">
+              <span style="font-weight: 600">{{f.label}}</span>
+              <span style="font-size: 13px; color: #5D6B7E">reps {{f.reps}}</span>
+            </label>
+            <div style="display: flex; align-items: center; gap: 10px">
+              <div style="flex: 1; display: flex; align-items: center; border: 1px solid #C9D1DB; border-radius: 9px; background: #FFFFFF; padding: 0 12px; min-height: 46px">
+                <span style="color: #5D6B7E; font-family: 'Geist Mono', ui-monospace, monospace">$</span>
+                <input id="{{f.id}}" type="number" inputmode="numeric" value="{{f.value}}" onChange="{{f.onChange}}" style="flex: 1; min-width: 0; border: 0; outline-offset: 4px; font: inherit; font-family: 'Geist Mono', ui-monospace, monospace; font-size: 17px; font-weight: 600; color: #101828; background: transparent; padding: 10px 4px">
+                <span style="color: #5D6B7E; font-family: 'Geist Mono', ui-monospace, monospace">k</span>
+              </div>
+              <span style="min-width: 64px; text-align: right; font-family: 'Geist Mono', ui-monospace, monospace; font-size: 14px; font-weight: 600; color: {{f.deltaColor}}">{{f.delta}}</span>
+            </div>
+          </div>
+        </sc-for>
+
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <label for="call-reason" style="font-weight: 600">Why you changed it</label>
+          <textarea id="call-reason" rows="3" style="font: inherit; font-size: 14px; padding: 10px 12px; border: 1px solid #C9D1DB; border-radius: 9px; resize: vertical; color: #101828; background: #FFFFFF">Holding back Northwind ($48k): no economic buyer, pushed twice.</textarea>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 14px; padding: 12px 14px; background: #F6F7F9; border-radius: 9px">
+          <span style="color: #5D6B7E">Your commit vs model</span>
+          <span style="font-family: 'Geist Mono', ui-monospace, monospace; font-weight: 600">{{vsModel}}</span>
+        </div>
+
+        <button type="button" style="font: inherit; font-weight: 600; min-height: 48px; border: 0; border-radius: 9px; background: #101828; color: #FFFFFF; cursor: pointer">Submit to Director</button>
+      </aside>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#2457D6","options":["#2457D6","#0B7285","#4B44C9","#101828"]},"density":{"editor":"enum","default":"comfortable","options":["comfortable","compact"]},"showBias":{"editor":"boolean","default":true},"$preview":{"width":1440,"height":1320}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { commit: 800, ml: 940, bc: 1200 };
+  }
+  renderVals() {
+    const accent = this.props.accent ?? '#2457D6';
+    const showBias = this.props.showBias ?? true;
+    const density = this.props.density ?? 'comfortable';
+    const hx = accent.replace('#', '');
+    const rgb = [0, 2, 4].map((i) => parseInt(hx.slice(i, i + 2), 16)).join(',');
+    const accentSoft = 'rgba(' + rgb + ',0.28)';
+    const s = this.state;
+    const money = (k) => (k >= 1000 ? '$' + (k / 1000).toFixed(2).replace(/0$/, '') + 'M' : '$' + Math.round(k) + 'k');
+    const delta = (a, b) => {
+      const d = Math.round(a - b);
+      if (d === 0) return 'same';
+      return (d > 0 ? '+$' : '−$') + Math.abs(d) + 'k';
+    };
+    const deltaColor = (a, b) => (a < b ? '#A14A0B' : a > b ? '#0B6B4A' : '#5D6B7E');
+
+    const scale = 250;
+    const p = (v) => Math.min(100, (v / scale) * 100).toFixed(1) + '%';
+    const raw = [
+      { name: 'Marcus Lee', commit: 210, adj: 218, model: 205, note: 'On track', warn: false },
+      { name: 'Ana Sousa', commit: 205, adj: 168, model: 172, note: '2 risky commits, above model', warn: true },
+      { name: 'Tom Becker', commit: 150, adj: 146, model: 158, note: '1 risky commit', warn: true },
+      { name: 'Grace Kim', commit: 190, adj: 173, model: 181, note: 'Thin pipeline, 2.9× coverage', warn: true },
+      { name: 'Diego Alvarez', commit: 85, adj: null, model: 96, note: 'Ramping, no track record yet', warn: false }
+    ];
+    const reps = raw.map((r) => {
+      const showAdj = showBias && r.adj !== null;
+      const pts = [r.commit, r.model].concat(showAdj ? [r.adj] : []);
+      const lo = Math.min.apply(null, pts), hi = Math.max.apply(null, pts);
+      return {
+        name: r.name,
+        initials: r.name.split(' ').map((x) => x[0]).join(''),
+        commit: '$' + r.commit + 'k',
+        commitPos: p(r.commit),
+        modelPos: p(r.model),
+        adjPos: showAdj ? p(r.adj) : '0%',
+        showAdj,
+        lo: p(lo),
+        span: ((hi - lo) / scale * 100).toFixed(1) + '%',
+        note: r.note,
+        warn: r.warn,
+        noteColor: r.warn ? '#A14A0B' : '#5D6B7E',
+        aria: 'Commit ' + r.commit + 'k, model ' + r.model + 'k' + (showAdj ? ', likely to land ' + r.adj + 'k' : '')
+      };
+    });
+
+    const risks = [
+      { account: 'Northwind Logistics', rep: 'Ana Sousa', close: 'Dec 12', why: 'No economic buyer · pushed twice', amount: '$48k' },
+      { account: 'Kestrel Media', rep: 'Tom Becker', close: 'Dec 5', why: 'Still at Proposal stage', amount: '$35k' },
+      { account: 'Brightlane Health', rep: 'Ana Sousa', close: 'Nov 28', why: 'No activity for 19 days', amount: '$22k' },
+      { account: 'Orbit Labs', rep: 'Diego Alvarez', close: 'Dec 19', why: 'No mutual close plan', amount: '$18k' }
+    ];
+
+    const setter = (key) => (e) => {
+      const v = parseFloat(e.target.value);
+      this.setState({ [key]: isNaN(v) ? 0 : v });
+    };
+    const fields = [
+      { id: 'call-commit', label: 'Commit', reps: '$840k', value: s.commit, onChange: setter('commit'), delta: delta(s.commit, 840), deltaColor: deltaColor(s.commit, 840) },
+      { id: 'call-ml', label: 'Most likely', reps: '$990k', value: s.ml, onChange: setter('ml'), delta: delta(s.ml, 990), deltaColor: deltaColor(s.ml, 990) },
+      { id: 'call-bc', label: 'Best case', reps: '$1.27M', value: s.bc, onChange: setter('bc'), delta: delta(s.bc, 1265), deltaColor: deltaColor(s.bc, 1265) }
+    ];
+
+    const weeks = Array.from({ length: 13 }, (_, i) => ({ color: i < 6 ? '#101828' : '#D5DBE3' }));
+
+    return {
+      accent,
+      accentSoft,
+      showBias,
+      rowPad: density === 'compact' ? '8px' : '14px',
+      reps,
+      risks,
+      fields,
+      weeks,
+      callPos: Math.min(100, Math.max(0, (s.commit / 1200) * 100)).toFixed(1) + '%',
+      commitLabel: money(s.commit),
+      vsModel: delta(s.commit, 812) + (s.commit >= 705 && s.commit <= 930 ? ', inside range' : ', outside range')
+    };
+  }
+}
+</script>
+</body>
+</html>
