@@ -50,6 +50,9 @@ const weightOf = (d: Deal, qs: string, qe: string) =>
  * Compare two weekly snapshots for a set of reps and explain the move in the most-likely number.
  * Each deal change is classified once: won, lost, new, pushed, pulled-in, then category / amount changes.
  */
+/** Deals below this size are left out of the week-over-week movement list (the way a CRO's inspection list works). */
+export const WOW_MATERIAL_AMOUNT = 20_000
+
 export function weekOverWeek(ds: Dataset, quarterIndex: number, fromWeek: number, toWeek: number, repIds: readonly string[]): WowChange[] {
   const q = ds.quarters[quarterIndex]
   const ids = new Set(repIds)
@@ -59,6 +62,7 @@ export function weekOverWeek(ds: Dataset, quarterIndex: number, fromWeek: number
   if (prev) for (const d of prev.deals) if (ids.has(d.ownerId)) prevMap.set(d.id, d)
   const curMap = new Map<string, Deal>()
   for (const d of cur.deals) if (ids.has(d.ownerId)) curMap.set(d.id, d)
+  const material = (a: Deal | undefined, b: Deal | undefined) => Math.max(a?.amount ?? 0, b?.amount ?? 0) >= WOW_MATERIAL_AMOUNT
 
   const acc = new Map<WowKind, { amount: number; count: number }>()
   const add = (kind: WowKind, amount: number) => {
@@ -71,6 +75,7 @@ export function weekOverWeek(ds: Dataset, quarterIndex: number, fromWeek: number
 
   for (const [id, d] of curMap) {
     const p = prevMap.get(id)
+    if (!material(p, d)) continue
     if (!p) {
       const eff = mostLikelyContribution(d, qs, qe)
       if (d.stage === 'Closed Won') add('won', eff)
@@ -96,7 +101,7 @@ export function weekOverWeek(ds: Dataset, quarterIndex: number, fromWeek: number
   }
   // Deals that vanished (lost deals dropped from the snapshot).
   for (const [id, p] of prevMap) {
-    if (curMap.has(id)) continue
+    if (curMap.has(id) || !material(p, undefined)) continue
     const before = mostLikelyContribution(p, qs, qe)
     if (p.stage !== 'Closed Won' && before !== 0) add('lost', -before)
   }

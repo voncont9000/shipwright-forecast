@@ -18,7 +18,8 @@ export function closedQuarterIndexes(ds: Dataset): number[] {
 
 /** Mean of actual / call over (call, actual) pairs, skipping calls <= 0. */
 export function meanRatio(pairs: readonly { call: number; actual: number }[]): number {
-  const usable = pairs.filter((p) => p.call > 0)
+  // A tiny or negative actual says nothing about forecasting skill, so it is skipped.
+  const usable = pairs.filter((p) => p.call > 0 && p.actual >= 0.1 * p.call)
   if (usable.length === 0) return NaN
   return usable.reduce((a, p) => a + p.actual / p.call, 0) / usable.length
 }
@@ -33,7 +34,7 @@ export function personBias(ds: Dataset, personId: string, week: number): BiasSta
     commit.push({ call: call.commit, actual })
     ml.push({ call: call.mostLikely, actual })
   }
-  const used = commit.filter((p) => p.call > 0).length
+  const used = commit.filter((p) => p.call > 0 && p.actual >= 0.1 * p.call).length
   if (used < MIN_QUARTERS_FOR_BIAS) return null
   return { commitRatio: meanRatio(commit), mostLikelyRatio: meanRatio(ml), quartersUsed: used }
 }
@@ -44,7 +45,7 @@ export function personMape(ds: Dataset, personId: string, week = 6): number {
   for (const qi of closedQuarterIndexes(ds)) {
     const call = seedCallFor(ds, qi, week, personId)
     const actual = ds.quarters[qi].actuals!.byPerson[personId]
-    if (!call || actual === undefined || Math.abs(actual) < 1) continue
+    if (!call || actual === undefined || actual < 50_000) continue
     errs.push(Math.abs(call.mostLikely - actual) / Math.abs(actual))
   }
   return errs.length ? errs.reduce((a, b) => a + b, 0) / errs.length : NaN
