@@ -179,8 +179,14 @@ function Wow({ from, to, changes }: { from: number; to: number; changes: WowChan
     const mid = changes.filter((c) => Math.abs(c.amount) >= 1000 || c.kind === "new").map((c) => {
       const start = run
       run += c.amount
-      return { key: c.kind, label: KIND_LABEL[c.kind], a: start, b: run, value: signedMoney(c.amount, '$0'), count: c.dealCount, kind: 'delta' as const }
+      return { key: c.kind as string, label: KIND_LABEL[c.kind], a: start, b: run, value: signedMoney(c.amount, '$0'), count: c.dealCount, kind: 'delta' as const }
     })
+    // Deal changes don't explain the whole move: managers' overrides and churn also change the call.
+    // Show the remainder so the rows always add up to this week's number.
+    const rest = to - run
+    if (changes.length && Math.abs(rest) >= 1000) {
+      mid.push({ key: 'rest', label: 'Overrides and churn', a: run, b: to, value: signedMoney(rest, '$0'), count: 0, kind: 'delta' as const })
+    }
     return [
       { key: 'from', label: 'Last week', a: null as number | null, b: from, value: moneyPrecise(from), count: 0, kind: 'total' as const },
       ...mid,

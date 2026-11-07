@@ -66,19 +66,20 @@ export function MiniRange({
 }: { range: ModelRange; value: number; domain: [number, number]; plan?: number; tone?: 'auto' | 'accent'; ariaLabel: string }) {
   const [lo, hi] = domain
   const pos = (v: number) => `${Math.min(100, Math.max(0, ((v - lo) / (hi - lo)) * 100)).toFixed(2)}%`
-  const out = value > range.p90 ? 'above range' : value < range.p10 ? 'below range' : null
+  const out = value > range.p75 ? 'above likely range' : value < range.p25 ? 'below likely range' : null
   const orange = tone === 'auto' && out
   return (
     <div className="relative h-[22px]" role="img" aria-label={ariaLabel}>
       <div className="absolute inset-x-0 top-2.5 h-0.5 bg-[#F0F2F5]" />
       <div className="absolute top-1 h-3.5 rounded-[3px] bg-[#E3E8F0]" style={{ left: pos(range.p10), width: `${(((range.p90 - range.p10) / (hi - lo)) * 100).toFixed(2)}%` }} />
-      <div className="absolute top-0.5 -ml-px h-[18px] w-0.5 bg-[#8A96A8]" style={{ left: pos(range.p50) }} />
+      <div className="absolute top-1 h-3.5 rounded-[2px] bg-[#B9C4D4]" style={{ left: pos(range.p25), width: `${(((range.p75 - range.p25) / (hi - lo)) * 100).toFixed(2)}%` }} />
+      <div className="absolute top-0.5 -ml-px h-[18px] w-0.5 bg-[#5D6B7E]" style={{ left: pos(range.p50) }} />
       {plan != null && <div className="absolute -top-px -ml-px h-6 w-0.5 bg-ink" style={{ left: pos(plan) }} />}
       <div className="absolute top-[5px] -ml-1.5 size-3 rounded-full" style={{ left: pos(value), background: orange ? '#E9A56A' : '#2457D6' }} />
       {orange && (
         <span
           className="absolute top-[-1px] whitespace-nowrap text-xs text-[#8A3F06]"
-          style={value > range.p90 ? { left: `calc(${pos(value)} + 12px)` } : { right: `calc(${100 - parseFloat(pos(value))}% + 12px)` }}
+          style={value > range.p75 ? { left: `calc(${pos(value)} + 12px)` } : { right: `calc(${100 - parseFloat(pos(value))}% + 12px)` }}
         >
           {out}
         </span>

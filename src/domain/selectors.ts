@@ -1,6 +1,6 @@
 import type { ForecastApi } from './api'
 import type {
-  AccuracyView, BoardView, Call, CallTriple, CroView, Coverage, Dataset, Deal, DealRow, Kpi, PersonRole,
+  AccuracyView, BoardView, Call, CallTriple, CroView, Coverage, Dataset, Deal, DealRow, Kpi, ModelRange, PersonRole,
   RepView, Segment, TeamRow, TeamView, TrendPoint, ViewInput, Week,
 } from './types'
 import { SEGMENTS } from './types'
@@ -24,8 +24,6 @@ export const DEADLINES: Record<PersonRole, string> = {
 }
 
 const COVERAGE_TARGET: Record<Segment, number> = { SMB: 3, MM: 3, ENT: 4 }
-/** A commit more than this far from the model's p50 gets a warning. */
-export const WARNING_THRESHOLD = 0.1
 
 const datasets = new Map<number, Dataset>()
 function load(seed = 42): Dataset {
@@ -111,10 +109,11 @@ function pct(x: number): number {
   return Math.round(x * 100)
 }
 
-function warningFor(commit: number, p50: number): string | null {
-  if (p50 <= 0 || commit <= 0) return null
-  const diff = (commit - p50) / p50
-  if (Math.abs(diff) <= WARNING_THRESHOLD) return null
+/** Flag a commit outside the model's middle band (P25-P75, half of outcomes), the same band the screens draw. */
+function warningFor(commit: number, m: ModelRange): string | null {
+  if (m.p50 <= 0 || commit <= 0) return null
+  if (commit >= m.p25 && commit <= m.p75) return null
+  const diff = (commit - m.p50) / m.p50
   return `Commit ${pct(Math.abs(diff))}% ${diff > 0 ? 'above' : 'below'} model`
 }
 
@@ -158,7 +157,7 @@ function teamView(ds: Dataset, input: ViewInput, personId: string): TeamView {
       biasNote: bias ? `lands at ${pct(bias.commitRatio)}% of commit on average` : null,
       model: model.p50,
       modelRange: model,
-      warning: warningFor(call.commit, model.p50),
+      warning: warningFor(call.commit, model),
       submitted: !!r,
     }
   })

@@ -22,7 +22,7 @@ export function BoardView() {
             {v.quarterLabel.split(' ')[0]} net new ARR · CRO's most likely call
           </h1>
           <div className="flex flex-wrap items-baseline gap-x-3.5 gap-y-1.5">
-            <span className="text-[56px] tabular-nums font-semibold leading-[1.05] tracking-[-0.03em]">{millions(v.call.mostLikely)}</span>
+            <span className="text-[56px] tabular-nums font-semibold leading-[1.05] tracking-[-0.015em]">{millions(v.call.mostLikely)}</span>
             <span className={`rounded-full px-2.5 py-1 text-sm font-semibold ${attain >= 1 ? 'bg-[#E4F4EC] text-good' : 'bg-warn-soft text-[#8A3F06]'}`}>
               {pct(attain)} of {millions(v.plan)} plan
             </span>
